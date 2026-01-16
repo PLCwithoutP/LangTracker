@@ -18,6 +18,7 @@ const App: React.FC = () => {
   const [entries, setEntries] = useState<StudyEntry[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'word' | 'idiom' | 'sentence'>('all');
+  const [activeView, setActiveView] = useState<'overview' | 'history'>('overview');
 
   // Load from LocalStorage on mount
   useEffect(() => {
@@ -102,15 +103,33 @@ const App: React.FC = () => {
     };
   }, [entries]);
 
+  const entriesByDate = useMemo(() => {
+    const groups: Record<string, StudyEntry[]> = {};
+    filteredEntries.forEach(entry => {
+      const dateKey = entry.date.split('T')[0];
+      if (!groups[dateKey]) groups[dateKey] = [];
+      groups[dateKey].push(entry);
+    });
+    return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [filteredEntries]);
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString(undefined, { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  };
+
   return (
     <div className="min-h-screen pb-20 bg-slate-50">
-      <Header />
+      <Header activeView={activeView} onViewChange={setActiveView} />
       
-      {/* Container max-width increased and alignment adjusted to move "left" parts more left */}
       <main className="w-full max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-8 mt-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
-          {/* Sidebar Area - Shifted left */}
+          {/* Sidebar Area */}
           <div className="lg:col-span-4 xl:col-span-3 space-y-6">
             <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-2xl p-6 text-white shadow-xl">
               <h2 className="text-lg font-bold mb-4 opacity-90 tracking-wide uppercase text-xs">Overview</h2>
@@ -157,10 +176,10 @@ const App: React.FC = () => {
 
           {/* Main Content Area */}
           <div className="lg:col-span-8 xl:col-span-9 space-y-6">
-            <StudyChart entries={entries} />
+            {activeView === 'overview' && <StudyChart entries={entries} />}
 
             {/* Search & Filter Bar */}
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4 sticky top-4 z-20 backdrop-blur-sm bg-white/90">
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4 sticky top-[80px] z-20 backdrop-blur-sm bg-white/90">
               <div className="relative flex-1">
                 <svg className="h-5 w-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -190,63 +209,92 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {/* Entry List */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {filteredEntries.length > 0 ? (
-                filteredEntries.map((entry) => (
-                  <div 
-                    key={entry.id} 
-                    className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:border-indigo-300 hover:shadow-md transition-all group relative overflow-hidden flex flex-col h-full"
-                  >
-                    <div className="absolute top-0 left-0 w-1 h-full opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-500" />
-                    <div className="flex justify-between items-start mb-4">
-                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
-                        entry.type === 'word' ? 'bg-blue-50 text-blue-600' :
-                        entry.type === 'idiom' ? 'bg-amber-50 text-amber-600' :
-                        'bg-emerald-50 text-emerald-600'
-                      }`}>
-                        {entry.type}
-                      </span>
-                      <div className="flex items-center gap-1">
-                        <span className="text-[10px] text-slate-400 font-bold">
-                          {new Date(entry.date).toLocaleDateString()}
-                        </span>
-                        <button 
-                          onClick={() => deleteEntry(entry.id)}
-                          className="p-1.5 text-slate-300 hover:text-rose-500 transition-colors"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
+            {/* View Rendering */}
+            {activeView === 'overview' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 animate-fadeIn">
+                {filteredEntries.length > 0 ? (
+                  filteredEntries.map((entry) => (
+                    <EntryCard key={entry.id} entry={entry} onDelete={deleteEntry} />
+                  ))
+                ) : (
+                  <EmptyState />
+                )}
+              </div>
+            ) : (
+              <div className="space-y-12 animate-fadeIn">
+                {entriesByDate.length > 0 ? (
+                  entriesByDate.map(([date, dateEntries]) => (
+                    <div key={date} className="space-y-4">
+                      <div className="flex items-center gap-4">
+                        <h3 className="text-sm font-black text-slate-400 uppercase tracking-[0.2em] whitespace-nowrap">
+                          {formatDate(date)}
+                        </h3>
+                        <div className="h-px bg-slate-200 w-full" />
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        {dateEntries.map(entry => (
+                          <EntryCard key={entry.id} entry={entry} onDelete={deleteEntry} />
+                        ))}
                       </div>
                     </div>
-                    
-                    <div className="flex-grow">
-                      <h4 className="text-xl font-black text-slate-900 leading-none mb-1 break-words">{entry.text}</h4>
-                      <p className="text-indigo-600 font-bold text-lg mb-4">{entry.translation}</p>
-                      
-                      {entry.notes && (
-                        <div className="pt-4 border-t border-slate-50">
-                          <p className="text-slate-500 text-sm leading-relaxed italic line-clamp-3">
-                            {entry.notes}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="col-span-full py-24 text-center bg-white rounded-3xl border-2 border-dashed border-slate-200">
-                  <p className="text-slate-400 font-bold uppercase tracking-widest text-sm">Nothing found in your study journal</p>
-                </div>
-              )}
-            </div>
+                  ))
+                ) : (
+                  <EmptyState />
+                )}
+              </div>
+            )}
           </div>
         </div>
       </main>
     </div>
   );
 };
+
+const EntryCard: React.FC<{ entry: StudyEntry, onDelete: (id: string) => void }> = ({ entry, onDelete }) => (
+  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:border-indigo-300 hover:shadow-md transition-all group relative overflow-hidden flex flex-col h-full">
+    <div className="absolute top-0 left-0 w-1 h-full opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-500" />
+    <div className="flex justify-between items-start mb-4">
+      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
+        entry.type === 'word' ? 'bg-blue-50 text-blue-600' :
+        entry.type === 'idiom' ? 'bg-amber-50 text-amber-600' :
+        'bg-emerald-50 text-emerald-600'
+      }`}>
+        {entry.type}
+      </span>
+      <div className="flex items-center gap-1">
+        <span className="text-[10px] text-slate-400 font-bold">
+          {new Date(entry.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </span>
+        <button 
+          onClick={() => onDelete(entry.id)}
+          className="p-1.5 text-slate-300 hover:text-rose-500 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </button>
+      </div>
+    </div>
+    
+    <div className="flex-grow">
+      <h4 className="text-xl font-black text-slate-900 leading-none mb-1 break-words">{entry.text}</h4>
+      <p className="text-indigo-600 font-bold text-lg mb-4">{entry.translation}</p>
+      
+      {entry.notes && (
+        <div className="pt-4 border-t border-slate-50">
+          <p className="text-slate-500 text-sm leading-relaxed italic line-clamp-3">
+            {entry.notes}
+          </p>
+        </div>
+      )}
+    </div>
+  </div>
+);
+
+const EmptyState = () => (
+  <div className="col-span-full py-24 text-center bg-white rounded-3xl border-2 border-dashed border-slate-200">
+    <p className="text-slate-400 font-bold uppercase tracking-widest text-sm">Nothing found in your study journal</p>
+  </div>
+);
 
 export default App;
