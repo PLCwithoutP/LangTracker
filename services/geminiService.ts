@@ -1,6 +1,3 @@
 
-/**
- * Service for handling language operations.
- * AI functionality has been removed per user request.
- */
-export const getTranslationSuggestion = async () => null;
+// This file is no longer used and can be safely ignored or deleted.
+export {};
