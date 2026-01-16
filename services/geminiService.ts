@@ -1,12 +1,17 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+// Use a getter to handle potentially undefined process.env at evaluation time
+const getAI = () => {
+  const apiKey = typeof process !== 'undefined' ? process.env.API_KEY : '';
+  return new GoogleGenAI({ apiKey: apiKey || '' });
+};
 
 export const getTranslationSuggestion = async (text: string, type: string) => {
   if (!text) return null;
 
   try {
+    const ai = getAI();
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Provide a clear translation and a usage example for this ${type}: "${text}". Respond in a structured JSON format.`,
